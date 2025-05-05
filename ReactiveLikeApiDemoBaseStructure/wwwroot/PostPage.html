@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Reactive Like Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 2rem;
+        }
+
+        .post {
+            border: 1px solid #ccc;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+        }
+
+        .like-btn {
+            padding: 0.5rem 1rem;
+            background: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+            .like-btn:hover {
+                background: #0056b3;
+            }
+    </style>
+</head>
+<body>
+    <h1>Live Like Updates</h1>
+    <div id="posts"></div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        const postsContainer = document.getElementById('posts');
+        const postsMap = {};
+        // Creates or updates a post element in the DOM based on post data.
+        function renderPost(post) {
+            let postElement = document.getElementById(`post-${post.id}`);
+
+            if (!postElement) {
+                postElement = document.createElement('div');
+                postElement.className = 'post';
+                postElement.id = `post-${post.id}`;
+                postElement.innerHTML = `
+                            <h3>${post.content}</h3>
+                            <p><strong>Likes:</strong> <span class="likes">${post.likes}</span></p>
+                            <button class="like-btn" onclick="likePost(${post.id})">Like</button>
+                        `;
+                postsContainer.appendChild(postElement);
+            } else {
+                // update num of likes
+                const likesElement = postElement.querySelector('.likes');
+                likesElement.textContent = post.likes;
+            }
+        }
+        // Sends a POST request to like a specific post by its ID.
+        function likePost(id) {
+            fetch(`/api/posts/${id}/like`, {
+                method: 'POST'
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error("Failed to like post.");
+                    return response.json();
+                })
+                .then(post => {
+                    console.log("Liked post:", post);
+                    // نترك SSE يتولى التحديث
+                })
+                .catch(err => console.error(err));
+        }
+        // Runs after the DOM is fully loaded; initializes posts and SSE subscription.
+        document.addEventListener("DOMContentLoaded", function () {
+            // Initial load of posts
+            fetch('/api/posts')
+                .then(res => res.json())
+                .then(data => {
+                    data.forEach(post => renderPost(post));
+                });
+
+            // SSE
+            const evtSource = new EventSource("/api/subscribe");
+
+            evtSource.onmessage = function (event) {
+                const post = JSON.parse(event.data);
+                console.log("Received update:", post);
+                renderPost(post); // re-render on update
+            };
+
+            evtSource.onerror = function (error) {
+                console.error("SSE connection error:", error);
+                evtSource.close();
+            };
+        });
+    </script>
+</body>
+</html>
+
+
